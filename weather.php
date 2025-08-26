@@ -1,6 +1,8 @@
 <?php
 $apiKey = 'bfe22cf083d83e8d0f1ac3b55bf70cc1';
-$cities = ['Saint Petersburg', 'Moscow', 'Volgograd', 'Archangelsk', 'Zvenigovo', 'London', 'Khabarovsk', 'Magadan', 'Paris', 'Ekaterinburg'];
+$cities = ['Saint Petersburg', 'Moscow', 'Volgograd', 'Archangelsk', 'Zvenigovo',
+           'London', 'Khabarovsk', 'Magadan', 'Paris', 'Ekaterinburg',
+        ];
 
 function get_weather($city, $apiKey){
     $params = ['q'=> $city,'appid' => $apiKey, 'units' => 'metric', 'lang' =>'ru'];
@@ -18,9 +20,40 @@ function get_weather($city, $apiKey){
     return $weather;
 } 
 
+echo '<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Weather</title>
+</head>
+<body>
+    <h2>Погода в различных городах</h2>
+    <table>
+        <tr>
+            <th>Город</th>
+            <th>Температура</th>
+            <th>Ощущается</th>
+            <th>Влажность</th>
+            <th>Давление</th>
+            <th>Описание</th>
+            <th>Ветер</th>
+        </tr>';
+
 foreach ($cities as $city){
     $weather = get_weather($city, $apiKey);
-    echo $weather['city'] .' '. $weather['temperature'] . ' '. $weather['feels'] .' '.
-    $weather['humidity'] . ' '. $weather['pressure'] .' '. $weather['description'] . 
-    ' ' . $weather['wind_speed'] . "<br/>";
+    echo '<tr>
+            <td>'. $weather['city'] .'</td>
+            <td>'. $weather['temperature'] . '</td>
+            <td>'. $weather['feels'] .'</td>
+            <td>'. $weather['humidity'] . '</td>
+            <td>'. $weather['pressure'] .'</td>
+            <td>'. $weather['description'] . '</td>
+            <td>'. $weather['wind_speed'] . '</td>
+        </tr>';
 }
+
+
+echo '</table>
+</body>
+</html>';
+?>
