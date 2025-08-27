@@ -1,5 +1,5 @@
 <?php
-$apiKey = trim(explode('=', trim(file_get_contents(__DIR__.'/.env')), 2)[1]);
+$apiKey = getenv('OPENWEATHER_API_KEY');
 $cities = ['Saint Petersburg', 'Moscow', 'Volgograd', 'Archangelsk', 'Zvenigovo',
            'London', 'Khabarovsk', 'Magadan', 'Paris', 'Ekaterinburg',
         ];
