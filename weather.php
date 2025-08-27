@@ -1,6 +1,5 @@
 <?php
-$apiKey = 'bfe22cf083d83e8d0f1ac3b55bf70cc1';
-$apiKey = getenv('OPENWEATHER_API_KEY') ?: ($_ENV['OPENWEATHER_API_KEY'] ?? null);
+$apiKey = trim(explode('=', trim(file_get_contents(__DIR__.'/.env')), 2)[1]);
 $cities = ['Saint Petersburg', 'Moscow', 'Volgograd', 'Archangelsk', 'Zvenigovo',
            'London', 'Khabarovsk', 'Magadan', 'Paris', 'Ekaterinburg',
         ];
@@ -62,7 +61,7 @@ echo '<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Weather</title>
+    <title>Погода</title>
 </head>
 <body>
     <h2>Погода</h2>
