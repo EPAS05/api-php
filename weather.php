@@ -20,6 +20,43 @@ function get_weather($city, $apiKey){
     return $weather;
 } 
 
+$weatherToDownload = [];
+foreach ($cities as $city){
+    $weather = get_weather($city, $apiKey);
+    array_push($weatherToDownload, $weather);
+}
+function generate_file($weatherToDownload){
+    header("Content-Type: text/csv; charset=UTF-8");
+    header('Content-Disposition: attachment; filename="weather' . date('Y-m-d') . '.csv"');
+    $output = fopen('php://output', 'w');
+    fputcsv($output,[
+        'Город', 
+        'Температура', 
+        'Ощущается', 
+        'Влажность', 
+        'Давление', 
+        'Описание', 
+        'Ветер'
+    ], ',', '"', "\\");
+    foreach ($weatherToDownload as $temp) {
+        fputcsv($output, [
+            $temp['city'],
+            $temp['temperature'],
+            $temp['feels'],
+            $temp['humidity'],
+            $temp['pressure'],
+            $temp['description'],
+            $temp['wind_speed'],
+        ], ',', '"', "\\");
+    }
+    fclose($output);
+    exit;
+}
+
+if(isset($_POST['download'])){
+   generate_file($weatherToDownload);
+}
+
 echo '<!DOCTYPE html>
 <html>
 <head>
@@ -27,7 +64,7 @@ echo '<!DOCTYPE html>
     <title>Weather</title>
 </head>
 <body>
-    <h2>Погода в различных городах</h2>
+    <h2>Погода</h2>
     <table>
         <tr>
             <th>Город</th>
@@ -39,8 +76,7 @@ echo '<!DOCTYPE html>
             <th>Ветер</th>
         </tr>';
 
-foreach ($cities as $city){
-    $weather = get_weather($city, $apiKey);
+foreach ($weatherToDownload as $weather){
     echo '<tr>
             <td>'. $weather['city'] .'</td>
             <td>'. $weather['temperature'] . '</td>
@@ -54,6 +90,9 @@ foreach ($cities as $city){
 
 
 echo '</table>
+    <form method="post">
+        <input type="submit" name="download" value="Скачать" /><br/>
+    </form>
 </body>
 </html>';
 ?>
