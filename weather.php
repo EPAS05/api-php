@@ -1,5 +1,6 @@
 <?php
 $apiKey = 'bfe22cf083d83e8d0f1ac3b55bf70cc1';
+$apiKey = getenv('OPENWEATHER_API_KEY') ?: ($_ENV['OPENWEATHER_API_KEY'] ?? null);
 $cities = ['Saint Petersburg', 'Moscow', 'Volgograd', 'Archangelsk', 'Zvenigovo',
            'London', 'Khabarovsk', 'Magadan', 'Paris', 'Ekaterinburg',
         ];
