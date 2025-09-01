@@ -1,0 +1,30 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Hello WeatherController!{% endblock %}
+
+{% block body %}
+<h1>Погода</h1>
+<table>
+    <tr>
+        <th>Город</th>
+        <th>Температура</th>
+        <th>Ощущается</th>
+        <th>Влажность</th>
+        <th>Давление</th>
+        <th>Описание</th>
+        <th>Ветер</th>
+    </tr>
+    {% for w in weather_in_cities %}
+        <tr>
+            <td>{{ w.city }}</td>
+            <td>{{ w.temperature }} </td>
+            <td>{{ w.feels }} </td>
+            <td>{{ w.humidity }} </td>
+            <td>{{ w.pressure }}</td>
+            <td>{{ w.description }}</td>
+            <td>{{ w.wind_speed }} </td>
+        </tr>
+    {% endfor %}
+</table>
+<a href="{{ path('weather_download') }}" class="btn btn-primary">Скачать CSV</a>
+{% endblock %}
