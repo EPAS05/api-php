@@ -9,7 +9,7 @@ use App\Service\GetWeatherService;
 use Symfony\Contracts\Cache\CacheInterface;
 final class WeatherController extends AbstractController
 {
-    #[Route('/weather', name: 'app_weather')]
+    #[Route('/weather', name: 'weather')]
     public function index(GetWeatherService $getWeatherService, CacheInterface $cache): Response
     {
         $weather_in_cities = $cache->get('weather_data', function ($item) use ($getWeatherService) {
@@ -61,5 +61,11 @@ final class WeatherController extends AbstractController
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="weather' . date('Y-m-d') . '.csv"',
         ]);
+    }
+    #[Route('/weather/refresh', name: 'weather_refresh')]
+    public function refresh(CacheInterface $cache): Response
+    {
+        $cache->delete('weather_data');
+        return $this->redirectToRoute('weather');
     }
 }
