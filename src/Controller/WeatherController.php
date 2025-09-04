@@ -99,9 +99,5 @@ final class WeatherController extends AbstractController
             'Content-Disposition' => 'attachment; filename="weather' . date('Y-m-d') . '.csv"',
         ]);
     }
-    #[Route('/weather/refresh', name: 'weather_refresh')]
-    public function refresh(): Response
-    {
-        return $this->redirectToRoute('weather');
-    }
+    
 }
