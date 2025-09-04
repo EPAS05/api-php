@@ -1,11 +1,13 @@
-FROM php:8.3-fpm
+FROM php:8.4-fpm
 
-# Устанавливаем зависимости и расширения
 RUN apt-get update && apt-get install -y \
-    libicu-dev libonig-dev libzip-dev zip \
-    && docker-php-ext-install intl pdo mbstring zip
-
-# Ставим composer внутрь контейнера
+    libicu-dev \
+    libonig-dev \
+    libzip-dev \
+    zip \
+    libpq-dev \ 
+    && docker-php-ext-install intl pdo mbstring zip pdo_pgsql \ 
+    && rm -rf /var/lib/apt/lists/* 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html

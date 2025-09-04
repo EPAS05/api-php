@@ -6,32 +6,69 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use App\Service\GetWeatherService;
-use Symfony\Contracts\Cache\CacheInterface;
+use Doctrine\ORM\EntityManagerInterface;
+use App\Entity\Weather;
+
 final class WeatherController extends AbstractController
 {
     #[Route('/weather', name: 'weather')]
-    public function index(GetWeatherService $getWeatherService, CacheInterface $cache): Response
-    {
-        $weather_in_cities = $cache->get('weather_data', function ($item) use ($getWeatherService) {
-            $item->expiresAfter(900);
-            $cities = ['Saint Petersburg', 'Moscow', 'Volgograd', 'Archangelsk', 'Zvenigovo',
-                'London', 'Khabarovsk', 'Magadan', 'Paris', 'Ekaterinburg',
+    public function index(GetWeatherService $getWeatherService, EntityManagerInterface $en): Response
+{
+    $cities = ['Saint Petersburg', 'Moscow', 'Volgograd', 'Archangelsk', 'Zvenigovo',
+                'London', 'Khabarovsk', 'Magadan', 'Paris', 'Ekaterinburg'
             ];
-            $data = [];
-            foreach ($cities as $city) {
-                $data[] = $getWeatherService->getWeather($city);
+    $weather_in_cities = [];
+    $now = new \DateTimeImmutable();
+    $tm = $now->modify('-15 minutes');
+
+    foreach ($cities as $city) {
+        $weather = $en->getRepository(Weather::class)->findOneBy(['city' => $city]);
+
+        if (!$weather) {
+            $data = $getWeatherService->getWeather($city);
+
+            $weather = new Weather(
+                (string)$data->getCity(),
+                (float)$data->getTemperature(),
+                (float)$data->getFeels(),
+                (int)$data->getHumidity(),
+                (int)$data->getPressure(),
+                (string)$data->getDescription(),
+                (float)$data->getWindSpeed()
+            );
+            $weather->setUpdatedAt($now);
+
+            $en->persist($weather);
+        } else {
+            $updatedAt = $weather->getUpdatedAt();
+            if (!$updatedAt || $updatedAt <= $tm) {
+                $data = $getWeatherService->getWeather($city);
+
+                $weather->setTemperature((float)$data->getTemperature())
+                    ->setFeels((float)$data->getFeels())
+                    ->setHumidity((int)$data->getHumidity())
+                    ->setPressure((int)$data->getPressure())
+                    ->setDescription((string)$data->getDescription())
+                    ->setWindSpeed((float)$data->getWindSpeed())
+                    ->setUpdatedAt($now);
             }
-            return $data;
-        });
-        return $this->render('weather/index.html.twig', [
-            'weather_in_cities' => $weather_in_cities
-        ]);
+        }
+
+        $weather_in_cities[] = $weather;
     }
 
+    $en->flush();
+
+    return $this->render('weather/index.html.twig', [
+        'weather_in_cities' => $weather_in_cities
+    ]);
+}
+
+
     #[Route('/weather/download', name: 'weather_download')]
-    public function generateFile(CacheInterface $cache): Response
+    public function generateFile(EntityManagerInterface $en): Response
     {
-        $weather_in_cities = $cache->get('weather_data', fn () => []);
+        $weather_in_cities = $en->getRepository(Weather::class)->findAll();
 
         $csv = fopen('php://temp', 'r+');
         fputcsv($csv, [
@@ -45,13 +82,13 @@ final class WeatherController extends AbstractController
         ], ',', '"', "\\");
         foreach ($weather_in_cities as $temp) {
             fputcsv($csv, [
-                $temp->city,
-                $temp->temperature,
-                $temp->feels,
-                $temp->humidity,
-                $temp->pressure,
-                $temp->description,
-                $temp->wind_speed,
+                $temp->getCity(),
+                $temp->getTemperature(),
+                $temp->getFeels(),
+                $temp->getHumidity(),
+                $temp->getPressure(),
+                $temp->getDescription(),
+                $temp->getWindSpeed(),
             ], ',', '"', "\\");
         }
         rewind($csv);
@@ -63,9 +100,8 @@ final class WeatherController extends AbstractController
         ]);
     }
     #[Route('/weather/refresh', name: 'weather_refresh')]
-    public function refresh(CacheInterface $cache): Response
+    public function refresh(): Response
     {
-        $cache->delete('weather_data');
         return $this->redirectToRoute('weather');
     }
 }
