@@ -3,6 +3,12 @@
 {% block title %}Hello WeatherController!{% endblock %}
 
 {% block body %}
+
+<a href="{{ path('app_logout') }}">
+    выйти
+</a>
+
+
 <h1>Погода</h1>
 <table>
     <tr>
@@ -28,8 +34,5 @@
 </table>
 <a href="{{ path('weather_download') }}">
     Скачать CSV
-</a>
-<a href="{{ path('weather_refresh') }}">
-    Обновить погоду
 </a>
 {% endblock %}

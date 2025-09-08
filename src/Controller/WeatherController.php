@@ -8,12 +8,14 @@ use Symfony\Component\Routing\Attribute\Route;
 use App\Service\GetWeatherService;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\Weather;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 
 final class WeatherController extends AbstractController
 {
     #[Route('/weather', name: 'weather')]
     public function index(GetWeatherService $getWeatherService, EntityManagerInterface $en): Response
 {
+    $this->denyAccessUnlessGranted('IS_AUTHENTICATED_FULLY');
     $cities = ['Saint Petersburg', 'Moscow', 'Volgograd', 'Archangelsk', 'Zvenigovo',
                 'London', 'Khabarovsk', 'Magadan', 'Paris', 'Ekaterinburg'
             ];
@@ -28,13 +30,13 @@ final class WeatherController extends AbstractController
             $data = $getWeatherService->getWeather($city);
 
             $weather = new Weather(
-                (string)$data->getCity(),
-                (float)$data->getTemperature(),
-                (float)$data->getFeels(),
-                (int)$data->getHumidity(),
-                (int)$data->getPressure(),
-                (string)$data->getDescription(),
-                (float)$data->getWindSpeed()
+                $data->getCity(),
+                $data->getTemperature(),
+                $data->getFeels(),
+                $data->getHumidity(),
+                $data->getPressure(),
+                $data->getDescription(),
+                $data->getWindSpeed()
             );
             $weather->setUpdatedAt($now);
 
@@ -44,12 +46,12 @@ final class WeatherController extends AbstractController
             if (!$updatedAt || $updatedAt <= $tm) {
                 $data = $getWeatherService->getWeather($city);
 
-                $weather->setTemperature((float)$data->getTemperature())
-                    ->setFeels((float)$data->getFeels())
-                    ->setHumidity((int)$data->getHumidity())
-                    ->setPressure((int)$data->getPressure())
-                    ->setDescription((string)$data->getDescription())
-                    ->setWindSpeed((float)$data->getWindSpeed())
+                $weather->setTemperature($data->getTemperature())
+                    ->setFeels($data->getFeels())
+                    ->setHumidity($data->getHumidity())
+                    ->setPressure($data->getPressure())
+                    ->setDescription($data->getDescription())
+                    ->setWindSpeed($data->getWindSpeed())
                     ->setUpdatedAt($now);
             }
         }
@@ -57,8 +59,11 @@ final class WeatherController extends AbstractController
         $weather_in_cities[] = $weather;
     }
 
-    $en->flush();
-
+    try {
+            $en->flush();
+        } catch (UniqueConstraintViolationException $e) {
+        
+        }
     return $this->render('weather/index.html.twig', [
         'weather_in_cities' => $weather_in_cities
     ]);
