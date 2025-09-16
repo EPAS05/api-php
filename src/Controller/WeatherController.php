@@ -8,6 +8,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use App\Service\GetWeatherService;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\Weather;
+use App\Entity\UserCity;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 
 final class WeatherController extends AbstractController
@@ -16,9 +17,15 @@ final class WeatherController extends AbstractController
     public function index(GetWeatherService $getWeatherService, EntityManagerInterface $en): Response
 {
     $this->denyAccessUnlessGranted('IS_AUTHENTICATED_FULLY');
-    $cities = ['Saint Petersburg', 'Moscow', 'Volgograd', 'Archangelsk', 'Zvenigovo',
-                'London', 'Khabarovsk', 'Magadan', 'Paris', 'Ekaterinburg'
+    $user = $this->getUser();
+    $userCities = $en->getRepository(UserCity::class)->findBy(['user' => $user]);
+
+    $defaultCities = ['Saint Petersburg', 'Moscow', 'Volgograd', 'Zvenigovo',
+            'Khabarovsk', 'Magadan','Ekaterinburg'
             ];
+
+    $userCityNames = array_map(fn($uc) => $uc->getCityName(), $userCities);
+    $cities = array_merge($defaultCities, $userCityNames);
     $weather_in_cities = [];
     $now = new \DateTimeImmutable();
     $tm = $now->modify('-15 minutes');

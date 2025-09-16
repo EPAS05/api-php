@@ -6,6 +6,9 @@ use App\Repository\UserRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\Common\Collections\ArrayCollection;
+
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
@@ -26,6 +29,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'string')]
     private string $password;
 
+    #[ORM\OneToMany(mappedBy: 'user', targetEntity: UserCity::class, orphanRemoval: true)]
+    private Collection $userCities;
+
+    public function __construct()
+    {
+        $this->userCities = new ArrayCollection();
+    }
     public function getId(): ?int
     {
         return $this->id;
@@ -74,6 +84,31 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    public function getUserCities(): Collection
+    {
+        return $this->userCities;
+    }
+
+    public function addUserCity(UserCity $userCity): static
+    {
+        if (!$this->userCities->contains($userCity)) {
+            $this->userCities->add($userCity);
+            $userCity->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeUserCity(UserCity $userCity): static
+    {
+        if ($this->userCities->removeElement($userCity)) {
+            if ($userCity->getUser() === $this) {
+                $userCity->setUser(null);
+            }
+        }
+
+        return $this;
+    }
     
     public function __serialize(): array
     {
