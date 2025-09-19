@@ -1,4 +1,0 @@
-const components = {};
-export {
-  components
-};

@@ -1,39 +1,38 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Hello WeatherController!{% endblock %}
+{% block title %}Погода{% endblock %}
 
 {% block body %}
+    <a href="{{ path('app_logout') }}">
+        выйти
+    </a>
 
-<a href="{{ path('app_logout') }}">
-    выйти
-</a>
+<div data-react-component="WeatherApp"></div>
 
-<div {{ react_component('WeatherApp') }}></div>
-
-<h1>Погода</h1>
-<table>
-    <tr>
-        <th>Город</th>
-        <th>Температура</th>
-        <th>Ощущается</th>
-        <th>Влажность</th>
-        <th>Давление</th>
-        <th>Описание</th>
-        <th>Ветер</th>
-    </tr>
-    {% for w in weather_in_cities %}
+    <h1>Погода</h1>
+    <table>
         <tr>
-            <td>{{ w.city }}</td>
-            <td>{{ w.temperature }} </td>
-            <td>{{ w.feels }} </td>
-            <td>{{ w.humidity }} </td>
-            <td>{{ w.pressure }}</td>
-            <td>{{ w.description }}</td>
-            <td>{{ w.windSpeed }} </td>
+            <th>Город</th>
+            <th>Температура</th>
+            <th>Ощущается</th>
+            <th>Влажность</th>
+            <th>Давление</th>
+            <th>Описание</th>
+            <th>Ветер</th>
         </tr>
-    {% endfor %}
-</table>
-<a href="{{ path('weather_download') }}">
-    Скачать CSV
-</a>
+        {% for w in weather_in_cities %}
+            <tr>
+                <td>{{ w.city }}</td>
+                <td>{{ w.temperature }}°C</td>
+                <td>{{ w.feels }}°C</td>
+                <td>{{ w.humidity }}%</td>
+                <td>{{ w.pressure }} hPa</td>
+                <td>{{ w.description }}</td>
+                <td>{{ w.windSpeed }} м/с</td>
+            </tr>
+        {% endfor %}
+    </table>
+    <a href="{{ path('weather_download') }}">
+        Скачать CSV
+    </a>
 {% endblock %}
