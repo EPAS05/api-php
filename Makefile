@@ -9,10 +9,10 @@ install: docker-down-clear \
 	api-npm-install \
 	api-npm-build \
 	api-database-prepare \
-	api-fixtures-load
+	api-fixtures-load \
+	open-browser
 
-start:
-	$(DOCKER_COMPOSE) up -d
+start: docker-up open-browser
 
 stop:
 	$(DOCKER_COMPOSE) down
@@ -54,3 +54,9 @@ docker-build:
 
 docker-up:
 	$(DOCKER_COMPOSE) up -d
+
+open-browser:
+	@echo "================================================"
+	@echo "Приложение готово к работе!"
+	@echo "Откройте http://localhost:8080/login в браузере"
+	@echo "================================================"
