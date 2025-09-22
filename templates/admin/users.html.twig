@@ -1,0 +1,35 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Управление пользователями{% endblock %}
+
+{% block body %}
+<a href="{{ path('app_logout') }}">
+    выйти
+</a>
+<div>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Email</th>
+                <th>Роли</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>
+                        {% for role in user.roles %}
+                            <span>
+                                {{ role|replace({'ROLE_': ''}) }}
+                            </span>
+                        {% endfor %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
