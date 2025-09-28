@@ -1,1 +1,1 @@
-console.log('Bootstrap loaded');
+console.log('Bootstrap loaded'); 

@@ -11,79 +11,82 @@ use App\Entity\Weather;
 use App\Entity\UserCity;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 
+
 final class WeatherController extends AbstractController
 {
+    private const WEATHER_CACHE_DURATION = '-15 minutes';
+    private const DEFAULT_CITIES = [
+        'Saint Petersburg', 'Moscow', 'Volgograd', 'Zvenigovo',
+        'Khabarovsk', 'Magadan', 'Ekaterinburg'
+    ];
+
+
     #[Route('/weather', name: 'weather')]
-    public function index(GetWeatherService $getWeatherService, EntityManagerInterface $en): Response
+    public function index(GetWeatherService $weatherService, EntityManagerInterface $entityManager): Response
 {
     $this->denyAccessUnlessGranted('IS_AUTHENTICATED_FULLY');
-    $user = $this->getUser();
-    $userCities = $en->getRepository(UserCity::class)->findBy(['user' => $user]);
+    $currentUser = $this->getUser();
+    $userCities = $entityManager->getRepository(UserCity::class)->findBy(['user' => $currentUser]);
+    $userCityNames = array_map(fn($userCity) => $userCity->getCityName(), $userCities);
+    $citiesToDisplay = array_merge(self::DEFAULT_CITIES, $userCityNames);
 
-    $defaultCities = ['Saint Petersburg', 'Moscow', 'Volgograd', 'Zvenigovo',
-            'Khabarovsk', 'Magadan','Ekaterinburg'
-            ];
+    $weatherInCities = [];
+    $currentTime = new \DateTimeImmutable();
+    $chacheExpiryTime = $currentTime->modify(self::WEATHER_CACHE_DURATION);
 
-    $userCityNames = array_map(fn($uc) => $uc->getCityName(), $userCities);
-    $cities = array_merge($defaultCities, $userCityNames);
-    $weather_in_cities = [];
-    $now = new \DateTimeImmutable();
-    $tm = $now->modify('-15 minutes');
+    foreach ($citiesToDisplay as $cityName) {
+        $chachedWeather = $entityManager->getRepository(Weather::class)->findOneBy(['city' => $cityName]);
 
-    foreach ($cities as $city) {
-        $weather = $en->getRepository(Weather::class)->findOneBy(['city' => $city]);
+        if (!$chachedWeather) {
+            $freshWeather = $weatherService->getWeather($cityName);
 
-        if (!$weather) {
-            $data = $getWeatherService->getWeather($city);
-
-            $weather = new Weather(
-                $data->getCity(),
-                $data->getTemperature(),
-                $data->getFeels(),
-                $data->getHumidity(),
-                $data->getPressure(),
-                $data->getDescription(),
-                $data->getWindSpeed()
+            $chachedWeather = new Weather(
+                $freshWeather->getCity(),
+                $freshWeather->getTemperature(),
+                $freshWeather->getFeels(),
+                $freshWeather->getHumidity(),
+                $freshWeather->getPressure(),
+                $freshWeather->getDescription(),
+                $freshWeather->getWindSpeed()
             );
-            $weather->setUpdatedAt($now);
-
-            $en->persist($weather);
+            $chachedWeather->setUpdatedAt($currentTime);
+            $entityManager->persist($chachedWeather);
         } else {
-            $updatedAt = $weather->getUpdatedAt();
-            if (!$updatedAt || $updatedAt <= $tm) {
-                $data = $getWeatherService->getWeather($city);
+            $lastUpdated = $chachedWeather->getUpdatedAt();
+            if (!$lastUpdated || $lastUpdated <= $chacheExpiryTime) {
+                $freshWeather = $weatherService->getWeather($cityName);
 
-                $weather->setTemperature($data->getTemperature())
-                    ->setFeels($data->getFeels())
-                    ->setHumidity($data->getHumidity())
-                    ->setPressure($data->getPressure())
-                    ->setDescription($data->getDescription())
-                    ->setWindSpeed($data->getWindSpeed())
-                    ->setUpdatedAt($now);
+                $chachedWeather->setTemperature($freshWeather->getTemperature())
+                    ->setFeels($freshWeather->getFeels())
+                    ->setHumidity($freshWeather->getHumidity())
+                    ->setPressure($freshWeather->getPressure())
+                    ->setDescription($freshWeather->getDescription())
+                    ->setWindSpeed($freshWeather->getWindSpeed())
+                    ->setUpdatedAt($currentTime);
             }
         }
 
-        $weather_in_cities[] = $weather;
+        $weatherInCities[] = $chachedWeather;
     }
 
     try {
-            $en->flush();
+            $entityManager->flush();
         } catch (UniqueConstraintViolationException $e) {
         
         }
     return $this->render('weather/index.html.twig', [
-        'weather_in_cities' => $weather_in_cities
+        'weather_data' => $weatherInCities
     ]);
 }
 
 
     #[Route('/weather/download', name: 'weather_download')]
-    public function generateFile(EntityManagerInterface $en): Response
+    public function generateFile(EntityManagerInterface $entityManager): Response
     {
-        $weather_in_cities = $en->getRepository(Weather::class)->findAll();
+        $allWeatherRecords = $entityManager->getRepository(Weather::class)->findAll();
 
-        $csv = fopen('php://temp', 'r+');
-        fputcsv($csv, [
+        $csvFile = fopen('php://temp', 'r+');
+        fputcsv($csvFile, [
             'Город',
             'Температура',
             'Ощущается',
@@ -92,24 +95,23 @@ final class WeatherController extends AbstractController
             'Описание',
             'Ветер'
         ], ',', '"', "\\");
-        foreach ($weather_in_cities as $temp) {
-            fputcsv($csv, [
-                $temp->getCity(),
-                $temp->getTemperature(),
-                $temp->getFeels(),
-                $temp->getHumidity(),
-                $temp->getPressure(),
-                $temp->getDescription(),
-                $temp->getWindSpeed(),
+        foreach ($allWeatherRecords as $weatherRecord) {
+            fputcsv($csvFile, [
+                $weatherRecord->getCity(),
+                $weatherRecord->getTemperature(),
+                $weatherRecord->getFeels(),
+                $weatherRecord->getHumidity(),
+                $weatherRecord->getPressure(),
+                $weatherRecord->getDescription(),
+                $weatherRecord->getWindSpeed(),
             ], ',', '"', "\\");
         }
-        rewind($csv);
-        $csvContent = stream_get_contents($csv);
-        fclose($csv);
+        rewind($csvFile);
+        $csvContent = stream_get_contents($csvFile);
+        fclose($csvFile);
         return new Response($csvContent,200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="weather' . date('Y-m-d') . '.csv"',
         ]);
     }
-    
 }

@@ -8,18 +8,18 @@ class GetWeatherService {
     public function __construct(string $apiKey) {
         $this->apiKey = $apiKey;
     }
-    public function getWeather(string $city): Weather {
-        $params = ['q'=> $city,'appid' => $this->apiKey,'units'=>'metric','lang'=>'ru'];
-        $url = "http://api.openweathermap.org/data/2.5/weather?" . http_build_query($params);
-        $json = json_decode(file_get_contents($url), true);
+    public function getWeather(string $cityName): Weather {
+        $queryParameters = ['q'=> $cityName,'appid' => $this->apiKey,'units'=>'metric','lang'=>'ru'];
+        $apiUrl = "http://api.openweathermap.org/data/2.5/weather?" . http_build_query($queryParameters);
+        $apiResponse = json_decode(file_get_contents($apiUrl), true);
         return new Weather(
-            $json['name'],
-            $json['main']['temp'],
-            $json['main']['feels_like'],
-            $json['main']['humidity'],
-            $json['main']['pressure'],
-            $json['weather'][0]['description'],
-            $json['wind']['speed']
+            $apiResponse['name'],
+            $apiResponse['main']['temp'],
+            $apiResponse['main']['feels_like'],
+            $apiResponse['main']['humidity'],
+            $apiResponse['main']['pressure'],
+            $apiResponse['weather'][0]['description'],
+            $apiResponse['wind']['speed']
         );
     }
 }
