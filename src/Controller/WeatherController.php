@@ -6,6 +6,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use App\Service\GetWeatherService;
+use App\Service\WeatherCSVService;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\Weather;
 use App\Entity\UserCity;
@@ -14,104 +15,91 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 
 final class WeatherController extends AbstractController
 {
-    private const WEATHER_CACHE_DURATION = '-15 minutes';
+    private const WEATHER_CACHE_DURATION_MINUTES = 15;
     private const DEFAULT_CITIES = [
         'Saint Petersburg', 'Moscow', 'Volgograd', 'Zvenigovo',
         'Khabarovsk', 'Magadan', 'Ekaterinburg'
     ];
 
+    public function __construct(
+        private GetWeatherService $weatherService,
+        private WeatherCSVService $csvGenerator,
+        private EntityManagerInterface $entityManager
+    ) {}
 
-    #[Route('/weather', name: 'weather')]
-    public function index(GetWeatherService $weatherService, EntityManagerInterface $entityManager): Response
-{
-    $this->denyAccessUnlessGranted('IS_AUTHENTICATED_FULLY');
-    $currentUser = $this->getUser();
-    $userCities = $entityManager->getRepository(UserCity::class)->findBy(['user' => $currentUser]);
-    $userCityNames = array_map(fn($userCity) => $userCity->getCityName(), $userCities);
-    $citiesToDisplay = array_merge(self::DEFAULT_CITIES, $userCityNames);
-
-    $weatherInCities = [];
-    $currentTime = new \DateTimeImmutable();
-    $chacheExpiryTime = $currentTime->modify(self::WEATHER_CACHE_DURATION);
-
-    foreach ($citiesToDisplay as $cityName) {
-        $chachedWeather = $entityManager->getRepository(Weather::class)->findOneBy(['city' => $cityName]);
-
-        if (!$chachedWeather) {
-            $freshWeather = $weatherService->getWeather($cityName);
-
-            $chachedWeather = new Weather(
-                $freshWeather->getCity(),
-                $freshWeather->getTemperature(),
-                $freshWeather->getFeels(),
-                $freshWeather->getHumidity(),
-                $freshWeather->getPressure(),
-                $freshWeather->getDescription(),
-                $freshWeather->getWindSpeed()
-            );
-            $chachedWeather->setUpdatedAt($currentTime);
-            $entityManager->persist($chachedWeather);
-        } else {
-            $lastUpdated = $chachedWeather->getUpdatedAt();
-            if (!$lastUpdated || $lastUpdated <= $chacheExpiryTime) {
-                $freshWeather = $weatherService->getWeather($cityName);
-
-                $chachedWeather->setTemperature($freshWeather->getTemperature())
-                    ->setFeels($freshWeather->getFeels())
-                    ->setHumidity($freshWeather->getHumidity())
-                    ->setPressure($freshWeather->getPressure())
-                    ->setDescription($freshWeather->getDescription())
-                    ->setWindSpeed($freshWeather->getWindSpeed())
-                    ->setUpdatedAt($currentTime);
-            }
-        }
-
-        $weatherInCities[] = $chachedWeather;
+    private function getCitiesForUser(): array
+    {
+        $user = $this->getUser();
+        $userCities = $this->entityManager->getRepository(UserCity::class)->findBy(['user' => $user]);
+        $userCityNames = array_map(fn(UserCity $userCity) => $userCity->getCityName(), $userCities);
+        return array_merge(self::DEFAULT_CITIES, $userCityNames);
+    }
+    
+    private function getWeatherEntity(string $city): Weather
+    {
+        return $this->entityManager->getRepository(Weather::class)->findOneBy(['city' => $city]) ?? $this->weatherService->getWeather($city);
     }
 
-    try {
-            $entityManager->flush();
-        } catch (UniqueConstraintViolationException $e) {
-        
-        }
-    return $this->render('weather/index.html.twig', [
-        'weather_data' => $weatherInCities
-    ]);
-}
+    private function shouldUpdateWeatherData(Weather $weather, \DateTimeImmutable $cacheExpirationTime): bool
+    {
+        $lastUpdate = $weather->getUpdatedAt();
+        return !$lastUpdate || $lastUpdate <= $cacheExpirationTime;
+    }
 
+    private function updateWeatherData(Weather $weather, string $city, \DateTimeImmutable $currentTime): void {
+        $weatherData = $this->weatherService->getWeather($city);
+
+        $weather
+            ->setCity($weatherData->getCity())
+            ->setTemperature($weatherData->getTemperature())
+            ->setFeels($weatherData->getFeels())
+            ->setHumidity($weatherData->getHumidity())
+            ->setPressure($weatherData->getPressure())
+            ->setDescription($weatherData->getDescription())
+            ->setWindSpeed($weatherData->getWindSpeed())
+            ->setUpdatedAt($currentTime);
+
+        $this->entityManager->persist($weather);
+    }
+
+    private function getWeatherDataForCities(array $cities): array
+    {
+        $weatherInCities = [];
+        $currentTime = new \DateTimeImmutable();
+        $cacheExpirationTime = $currentTime->modify("-" . self::WEATHER_CACHE_DURATION_MINUTES . " minutes");
+
+        foreach ($cities as $city) {
+            $weatherEntity = $this->getWeatherEntity($city);
+            
+            if ($this->shouldUpdateWeatherData($weatherEntity, $cacheExpirationTime)) {
+                $this->updateWeatherData($weatherEntity, $city, $currentTime);
+            }
+            $weatherInCities[] = $weatherEntity;
+        }
+
+        $this->entityManager->flush();
+
+        return $weatherInCities;
+    }
+
+    #[Route('/weather', name: 'weather')]
+    public function index(): Response
+    {
+        $this->denyAccessUnlessGranted('IS_AUTHENTICATED_FULLY');
+        
+        $cities = $this->getCitiesForUser();
+        $weather= $this->getWeatherDataForCities($cities);
+        
+        return $this->render('weather/index.html.twig', [
+            'weather_data' => $weather
+        ]);
+    }
 
     #[Route('/weather/download', name: 'weather_download')]
-    public function generateFile(EntityManagerInterface $entityManager): Response
+    public function downloadWeatherCSV(): Response
     {
-        $allWeatherRecords = $entityManager->getRepository(Weather::class)->findAll();
-
-        $csvFile = fopen('php://temp', 'r+');
-        fputcsv($csvFile, [
-            'Город',
-            'Температура',
-            'Ощущается',
-            'Влажность',
-            'Давление',
-            'Описание',
-            'Ветер'
-        ], ',', '"', "\\");
-        foreach ($allWeatherRecords as $weatherRecord) {
-            fputcsv($csvFile, [
-                $weatherRecord->getCity(),
-                $weatherRecord->getTemperature(),
-                $weatherRecord->getFeels(),
-                $weatherRecord->getHumidity(),
-                $weatherRecord->getPressure(),
-                $weatherRecord->getDescription(),
-                $weatherRecord->getWindSpeed(),
-            ], ',', '"', "\\");
-        }
-        rewind($csvFile);
-        $csvContent = stream_get_contents($csvFile);
-        fclose($csvFile);
-        return new Response($csvContent,200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="weather' . date('Y-m-d') . '.csv"',
-        ]);
+        $cities = $this->getCitiesForUser();
+        $weatherData = $this->getWeatherDataForCities($cities);
+        return $this->csvGenerator->generateCsvResponse($weatherData);
     }
 }
